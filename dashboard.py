@@ -12,6 +12,11 @@ import ctypes.util
 from ctypes.util import find_library
 from weasyprint import HTML
 
+
+# Installation des dépendances système pour Streamlit Cloud
+if platform.system() == "Linux" and "STREAMLIT_SERVER_RUNNING" in os.environ:
+    os.system('apt-get update && apt-get install -y libpango-1.0-0 libharfbuzz0b libpangoft2-1.0-0')
+    
 # Configuration GTK
 GTK_PATH = r"C:\Program Files\GTK3-Runtime Win64\bin"
 os.environ['PATH'] = GTK_PATH + os.pathsep + os.environ['PATH']
