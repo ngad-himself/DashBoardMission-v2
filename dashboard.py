@@ -6,6 +6,8 @@ import io
 import tempfile
 import os
 from fpdf import FPDF
+import matplotlib.pyplot as plt
+import numpy as np
 
 st.set_page_config(layout="wide")
 
@@ -137,13 +139,45 @@ st.download_button("📥 Télécharger Excel", data=excel_output,
                    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 # === PDF ===
-def save_fig_as_png(fig, path):
-    fig.write_image(path, engine='kaleido', width=900, height=500, scale=1.5)
+
+def plot_grouped_bar(df, y_col, title, ylabel, path):
+    plt.figure(figsize=(10, 5))
+    missions = df['Mission'].unique()
+    mois = df['Mois'].unique()
+    x = np.arange(len(mois))
+
+    group_gap = 0.15
+    total_width = 0.8
+    n = len(missions)
+    bar_width = (total_width - group_gap * (n - 1)) / n
+
+    for i, mission in enumerate(missions):
+        d = df[df['Mission'] == mission]
+        bar_positions = x - total_width/2 + i * (bar_width + group_gap) + bar_width / 2
+        bars = plt.bar(bar_positions, d[y_col], width=bar_width, label=mission)
+
+        # Texte sur les barres uniquement pour 'Adultes' ou 'Offrandes'
+        if y_col in ['Adultes', 'Offrandes']:
+            for xi, yi in zip(bar_positions, d[y_col]):
+                plt.text(xi, yi + 0.5, str(int(yi)), ha='center', va='bottom', fontsize=8, color='black')
+
+    plt.grid(axis='y', linestyle='--', alpha=0.2)
+    plt.title(title)
+    plt.ylabel(ylabel)
+    plt.xticks(x, mois, rotation=45, ha='right')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(path)
+    plt.close()
+
 
 class PDF(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 16)
-        self.cell(0, 10, "Rapport de Mission", 0, 1, 'C')
+        self.cell(0, 10, "Rapport Mensuel de Mission - RMM", 0, 1, 'C')
+        self.set_font('Arial', '', 10)
+        date_str = datetime.today().strftime('%d/%m/%Y')
+        self.cell(0, 10, f"Ce rapport a été généré à la date : {date_str}", 0, 1, 'L')
         self.ln(5)
 
     def footer(self):
@@ -181,7 +215,7 @@ def create_pdf(df_moy, df_nanac, df_off, imgs, mois_label):
     # Page 1 : Moyennes fréquentation
     pdf.add_page()
     pdf.set_font('Arial', 'B', 12)
-    pdf.cell(0, 10, f"Moyennes de fréquentation au culte - {', '.join(mois_label)}", 0, 1, 'C')
+    pdf.cell(0, 10, f"Fréquentation moyenne au culte - {', '.join(mois_label)}", 0, 1, 'C')
     add_table(pdf, df_moy)
     pdf.ln(5)
     pdf.image(imgs['moyenne'], x=10, w=190)
@@ -195,7 +229,6 @@ def create_pdf(df_moy, df_nanac, df_off, imgs, mois_label):
     pdf.image(imgs['na'], x=10, w=190, h=90)
     pdf.ln(3)
     pdf.image(imgs['nc'], x=10, w=190, h=90)
-
 
     # Page 3 : Offrandes
     pdf.add_page()
@@ -219,10 +252,10 @@ if st.button("🖨️ Générer le rapport PDF"):
                 "offrandes": os.path.join(temp_dir, "offrandes.png")
             }
 
-            save_fig_as_png(fig_moy, paths['moyenne'])
-            save_fig_as_png(fig_na, paths['na'])
-            save_fig_as_png(fig_nc, paths['nc'])
-            save_fig_as_png(fig_off, paths['offrandes'])
+            plot_grouped_bar(grouped_moyenne, 'Adultes', "Fréquentation des Adultes par Mission", "Adultes", paths['moyenne'])
+            plot_grouped_bar(grouped_nanac, 'NA', "Nombre de NA par Mission", "NA", paths['na'])
+            plot_grouped_bar(grouped_nanac, 'NC', "Nombre de NC par Mission", "NC", paths['nc'])
+            plot_grouped_bar(grouped_offrandes_graph, 'Offrandes', "Offrandes par Mission", "Euros", paths['offrandes'])
 
             pdf = create_pdf(grouped_moyenne, grouped_nanac, grouped_offrandes, paths, selected_months)
             pdf_path = os.path.join(temp_dir, "rapport_missions.pdf")
