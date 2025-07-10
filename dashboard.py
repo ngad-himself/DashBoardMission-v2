@@ -46,8 +46,13 @@ def load_data():
 
 df, mois_complet = load_data()
 
+# Ne garder que les mois ayant au moins une donnée
+mois_avec_donnees = df['Mois'].unique()
+mois_complet = [m for m in mois_complet if m in mois_avec_donnees]
+
 def format_mois_fr(period):
-    mois_annee = period.strftime('%B %Y')
+    dt = period.to_timestamp()
+    mois_annee = dt.strftime('%B %Y')
     for en, fr in MOIS_FR.items():
         mois_annee = mois_annee.replace(en, fr)
     return mois_annee
@@ -59,57 +64,74 @@ def get_previous_month_index():
     today = pd.Timestamp.today()
     prev_month = (today - pd.DateOffset(months=1)).to_period('M')
     try:
-        return mois_complet.get_loc(prev_month)
-    except:
-        return len(mois_complet) - 1
+        return mois_complet.index(prev_month)
+    except ValueError:
+        return len(mois_complet) - 1 if mois_complet else 0
 
 # Sélections
 default_month_idx = get_previous_month_index()
 default_missions = [m for m in ['Alès', 'Béziers', 'MNO'] if m in missions]
 selected_missions = st.multiselect("Sélectionnez la/les mission(s)", options=missions, default=default_missions)
-selected_months = st.multiselect("Sélectionnez le(s) mois", options=mois_str, default=[mois_str[default_month_idx]])
+selected_months = st.multiselect("Sélectionnez le(s) mois", options=mois_str, default=[mois_str[default_month_idx]] if mois_str else [])
 
 if not selected_missions or not selected_months:
     st.warning("❗ Veuillez sélectionner au moins une mission et un mois pour afficher les données.")
     st.stop()
 
-selected_months_period = [mois_complet[mois_str.index(m)] for m in selected_months]
+# VÉRIFICATION STRICTE DES MOIS SANS DONNÉES
+for month in selected_months:
+    if "Août" in month or "August" in month:
+        st.info("⏳ Encore un peu de patience, il n'y a pas de statistiques pour ce(s) mois sélectionné(s).")
+        st.stop()
+        
+    month_period = mois_complet[mois_str.index(month)]
+    if df[(df['Mois'] == month_period)].empty:
+        st.info(f"⏳ Encore un peu de patience, il n'y a pas de statistiques pour ce(s) mois sélectionné(s).")
+        st.stop()
 
-df_filtered = df[(df['Mission'].isin(selected_missions)) & (df['Mois'].isin(selected_months_period))]
+try:
+    selected_months_period = [mois_complet[mois_str.index(m)] for m in selected_months]
+    df_filtered = df[(df['Mission'].isin(selected_missions)) & (df['Mois'].isin(selected_months_period))]
+    
+    if df_filtered.empty:
+        raise ValueError("Aucune donnée disponible")
+        
+except (ValueError, IndexError):
+    st.info("⏳ Encore un peu de patience, il n'y a pas de statistiques pour ce(s) mois sélectionné(s).")
+    st.stop()
+
 
 # === Moyennes ===
 cols_moyenne = ['Hommes', 'Femmes', 'Adultes']
 grouped_moyenne = df_filtered.groupby(['Mission', 'Mois'], observed=True)[cols_moyenne].mean().round().reset_index()
-grouped_moyenne = grouped_moyenne.dropna()
 grouped_moyenne['Mois'] = grouped_moyenne['Mois'].apply(format_mois_fr)
 
 st.subheader("📊 Moyenne de fréquentation au culte des missions et par mois")
 st.dataframe(grouped_moyenne, use_container_width=True, hide_index=True)
 
 fig_moy = px.bar(grouped_moyenne, x='Mois', y='Adultes', color='Mission',
-                barmode='group', text='Mission', title="Fréquentation des Adultes par Mission")
+                 barmode='group', text='Mission', title="Fréquentation des Adultes par Mission")
 fig_moy.update_layout(bargap=0.2, bargroupgap=0.04)
 fig_moy.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
 st.plotly_chart(fig_moy, use_container_width=True)
 
 # === NA / NC ===
 grouped_nanac = df_filtered.groupby(['Mission', 'Mois'], observed=True)[['NA', 'NC']].sum().reset_index()
-grouped_nanac = grouped_nanac.dropna()
 grouped_nanac['Mois'] = grouped_nanac['Mois'].apply(format_mois_fr)
 
-st.subheader("🧾 Nombre de NA | NC des missions par moi")
+st.subheader("🧾 Nombre de NA | NC des missions par mois")
 st.dataframe(grouped_nanac, use_container_width=True, hide_index=True)
-fig_na = px.bar(grouped_nanac, x='Mois', y='NA', color='Mission', 
+
+fig_na = px.bar(grouped_nanac, x='Mois', y='NA', color='Mission',
                 barmode='group', text='Mission', title="Nombre de NA par Mission")
 fig_na.update_layout(bargap=0.2, bargroupgap=0.07)
 fig_na.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
 
-fig_nc = px.bar(grouped_nanac, x='Mois', y='NC', color='Mission', 
+fig_nc = px.bar(grouped_nanac, x='Mois', y='NC', color='Mission',
                 barmode='group', text='Mission', title="Nombre de NC par Mission")
 fig_nc.update_layout(bargap=0.2, bargroupgap=0.07)
 fig_nc.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
 
-# Affichage côte à côte
 col1, col2 = st.columns(2)
 with col1:
     st.plotly_chart(fig_na, use_container_width=True)
@@ -119,14 +141,15 @@ with col2:
 # === Offrandes ===
 grouped_offrandes = df_filtered.groupby(['Mission', 'Mois'], observed=True)[['Offrandes']].sum().reset_index()
 grouped_offrandes_graph = grouped_offrandes.copy()
+grouped_offrandes['Mois'] = grouped_offrandes['Mois'].apply(format_mois_fr)
 grouped_offrandes_graph['Mois'] = grouped_offrandes_graph['Mois'].apply(format_mois_fr)
 grouped_offrandes['Offrandes'] = grouped_offrandes['Offrandes'].apply(lambda x: f"{x:,.2f} €".replace(",", " ").replace(".", ","))
-grouped_offrandes['Mois'] = grouped_offrandes['Mois'].apply(format_mois_fr)
 
 st.subheader("💶 Somme des Offrandes des missions par mois")
 st.dataframe(grouped_offrandes, use_container_width=True, hide_index=True)
+
 fig_off = px.bar(grouped_offrandes_graph, x='Mois', y='Offrandes', color='Mission',
-                barmode='group', text='Mission', title="Offrandes par Mission")
+                 barmode='group', text='Mission', title="Offrandes par Mission")
 fig_off.update_layout(bargap=0.2, bargroupgap=0.04)
 fig_off.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
 st.plotly_chart(fig_off, use_container_width=True)
@@ -144,7 +167,6 @@ st.download_button("📥 Télécharger Excel", data=excel_output,
                    mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 # === PDF ===
-
 def plot_grouped_bar(df, y_col, title, ylabel, path):
     plt.figure(figsize=(10, 5))
     missions = df['Mission'].unique()
@@ -173,7 +195,6 @@ def plot_grouped_bar(df, y_col, title, ylabel, path):
     plt.tight_layout()
     plt.savefig(path)
     plt.close()
-
 
 class PDF(FPDF):
     def header(self):
@@ -208,7 +229,6 @@ def add_table(pdf, df):
             if isinstance(val, float) and val.is_integer():
                 val = int(val)
             txt = str(val).replace('€', 'Euros')
-
             pdf.cell(col_widths[i], 7, txt, 1, 0, 'C')
         pdf.ln()
 
@@ -261,10 +281,6 @@ if st.button("🖨️ Générer le rapport PDF"):
             pdf.output(pdf_path)
 
             with open(pdf_path, "rb") as f:
-                pdf_bytes = f.read()
-
-            st.success("✅ Rapport PDF généré avec succès !")
-            st.download_button("📄 Télécharger le rapport PDF", data=pdf_bytes,
-                               file_name="rapport_missions.pdf", mime="application/pdf")
-
-# Fin du script
+                st.success("✅ Rapport PDF généré avec succès !")
+                st.download_button("📄 Télécharger le rapport PDF", data=f,
+                                   file_name="rapport_missions.pdf", mime="application/pdf")
