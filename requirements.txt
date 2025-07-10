@@ -4,3 +4,6 @@ plotly
 fpdf
 matplotlib
 Xlsxwriter
+fpdf2
+numpy
+pyarrow

@@ -37,21 +37,18 @@ def load_data():
     df['Offrandes'] = df['Offrandes'].apply(clean_offrandes)
     df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y', errors='coerce')
     df = df.dropna(subset=['Date'])
-
-    df['Mois'] = df['Date'].dt.to_period('M')
-    mois_complet = pd.period_range(start=df['Mois'].min(), end=df['Mois'].max(), freq='M')
+    
+    # Modification clé: utiliser des strings au lieu de Period
+    df['Mois'] = df['Date'].dt.strftime('%Y-%m')
+    mois_complet = pd.date_range(start=df['Date'].min(), end=df['Date'].max(), freq='MS').strftime('%Y-%m').tolist()
     df['Mois'] = pd.Categorical(df['Mois'], categories=mois_complet, ordered=True)
 
     return df, mois_complet
 
 df, mois_complet = load_data()
 
-# Ne garder que les mois ayant au moins une donnée
-mois_avec_donnees = df['Mois'].unique()
-mois_complet = [m for m in mois_complet if m in mois_avec_donnees]
-
-def format_mois_fr(period):
-    dt = period.to_timestamp()
+def format_mois_fr(month_str):
+    dt = datetime.strptime(month_str, '%Y-%m')
     mois_annee = dt.strftime('%B %Y')
     for en, fr in MOIS_FR.items():
         mois_annee = mois_annee.replace(en, fr)
@@ -62,7 +59,7 @@ mois_str = [format_mois_fr(m) for m in mois_complet]
 
 def get_previous_month_index():
     today = pd.Timestamp.today()
-    prev_month = (today - pd.DateOffset(months=1)).to_period('M')
+    prev_month = (today - pd.DateOffset(months=1)).strftime('%Y-%m')
     try:
         return mois_complet.index(prev_month)
     except ValueError:
@@ -78,28 +75,19 @@ if not selected_missions or not selected_months:
     st.warning("❗ Veuillez sélectionner au moins une mission et un mois pour afficher les données.")
     st.stop()
 
-# VÉRIFICATION STRICTE DES MOIS SANS DONNÉES
-for month in selected_months:
-    if "Août" in month or "August" in month:
+# Vérification des données disponibles
+try:
+    selected_months_str = [mois_complet[mois_str.index(m)] for m in selected_months]
+    df_filtered = df[(df['Mission'].isin(selected_missions)) & (df['Mois'].isin(selected_months_str))]
+    
+    # Vérification stricte
+    if df_filtered.empty or df_filtered[['Hommes', 'Femmes', 'Adultes', 'NA', 'NC', 'Offrandes']].isnull().all().all():
         st.info("⏳ Encore un peu de patience, il n'y a pas de statistiques pour ce(s) mois sélectionné(s).")
         st.stop()
         
-    month_period = mois_complet[mois_str.index(month)]
-    if df[(df['Mois'] == month_period)].empty:
-        st.info(f"⏳ Encore un peu de patience, il n'y a pas de statistiques pour ce(s) mois sélectionné(s).")
-        st.stop()
-
-try:
-    selected_months_period = [mois_complet[mois_str.index(m)] for m in selected_months]
-    df_filtered = df[(df['Mission'].isin(selected_missions)) & (df['Mois'].isin(selected_months_period))]
-    
-    if df_filtered.empty:
-        raise ValueError("Aucune donnée disponible")
-        
-except (ValueError, IndexError):
+except Exception as e:
     st.info("⏳ Encore un peu de patience, il n'y a pas de statistiques pour ce(s) mois sélectionné(s).")
     st.stop()
-
 
 # === Moyennes ===
 cols_moyenne = ['Hommes', 'Femmes', 'Adultes']
