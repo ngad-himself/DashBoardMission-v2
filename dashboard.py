@@ -37,110 +37,101 @@ def load_data():
     df['Offrandes'] = df['Offrandes'].apply(clean_offrandes)
     df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y', errors='coerce')
     df = df.dropna(subset=['Date'])
-    
-    # Modification clé: utiliser des strings au lieu de Period
-    df['Mois'] = df['Date'].dt.strftime('%Y-%m')
-    mois_complet = pd.date_range(start=df['Date'].min(), end=df['Date'].max(), freq='MS').strftime('%Y-%m').tolist()
-    df['Mois'] = pd.Categorical(df['Mois'], categories=mois_complet, ordered=True)
 
-    return df, mois_complet
+    df['Mois'] = df['Date'].dt.to_period('M')
+    df['Mois'] = pd.Categorical(df['Mois'], ordered=True)
+    return df
 
-df, mois_complet = load_data()
+df = load_data()
 
-def format_mois_fr(month_str):
-    dt = datetime.strptime(month_str, '%Y-%m')
-    mois_annee = dt.strftime('%B %Y')
+def format_mois_fr(period):
+    mois_annee = period.strftime('%B %Y')
     for en, fr in MOIS_FR.items():
         mois_annee = mois_annee.replace(en, fr)
     return mois_annee
 
 missions = sorted(df['Mission'].dropna().unique())
-mois_str = [format_mois_fr(m) for m in mois_complet]
+mois_avec_donnees = sorted(df['Mois'].dropna().unique())
+mois_str = [format_mois_fr(m) for m in mois_avec_donnees]
+
 
 def get_previous_month_index():
     today = pd.Timestamp.today()
-    prev_month = (today - pd.DateOffset(months=1)).strftime('%Y-%m')
+    prev_month = (today - pd.DateOffset(months=1)).to_period('M')
     try:
-        return mois_complet.index(prev_month)
-    except ValueError:
-        return len(mois_complet) - 1 if mois_complet else 0
+        return mois_avec_donnees.index(prev_month)
+    except:
+        return len(mois_avec_donnees) - 1
 
 # Sélections
 default_month_idx = get_previous_month_index()
 default_missions = [m for m in ['Alès', 'Béziers', 'MNO'] if m in missions]
 selected_missions = st.multiselect("Sélectionnez la/les mission(s)", options=missions, default=default_missions)
-selected_months = st.multiselect("Sélectionnez le(s) mois", options=mois_str, default=[mois_str[default_month_idx]] if mois_str else [])
+selected_months = st.multiselect("Sélectionnez le(s) mois", options=mois_str, default=[mois_str[default_month_idx]])
 
 if not selected_missions or not selected_months:
     st.warning("❗ Veuillez sélectionner au moins une mission et un mois pour afficher les données.")
     st.stop()
 
-# Vérification des données disponibles
 try:
-    selected_months_str = [mois_complet[mois_str.index(m)] for m in selected_months]
-    df_filtered = df[(df['Mission'].isin(selected_missions)) & (df['Mois'].isin(selected_months_str))]
-    
-    # Vérification stricte
-    if df_filtered.empty or df_filtered[['Hommes', 'Femmes', 'Adultes', 'NA', 'NC', 'Offrandes']].isnull().all().all():
-        st.info("⏳ Encore un peu de patience, il n'y a pas de statistiques pour ce(s) mois sélectionné(s).")
-        st.stop()
-        
-except Exception as e:
+    selected_months_period = [mois_avec_donnees[mois_str.index(m)] for m in selected_months]
+except ValueError:
+    st.info("⏳ Encore un peu de patience, il n'y a pas de statistiques pour ce(s) mois sélectionné(s).")
+    st.stop()
+
+df_filtered = df[(df['Mission'].isin(selected_missions)) & (df['Mois'].isin(selected_months_period))]
+
+if df_filtered.empty:
     st.info("⏳ Encore un peu de patience, il n'y a pas de statistiques pour ce(s) mois sélectionné(s).")
     st.stop()
 
 # === Moyennes ===
 cols_moyenne = ['Hommes', 'Femmes', 'Adultes']
 grouped_moyenne = df_filtered.groupby(['Mission', 'Mois'], observed=True)[cols_moyenne].mean().round().reset_index()
-grouped_moyenne['Mois'] = grouped_moyenne['Mois'].apply(format_mois_fr)
-
-st.subheader("📊 Moyenne de fréquentation au culte des missions et par mois")
-st.dataframe(grouped_moyenne, use_container_width=True, hide_index=True)
-
-fig_moy = px.bar(grouped_moyenne, x='Mois', y='Adultes', color='Mission',
-                 barmode='group', text='Mission', title="Fréquentation des Adultes par Mission")
-fig_moy.update_layout(bargap=0.2, bargroupgap=0.04)
-fig_moy.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
-st.plotly_chart(fig_moy, use_container_width=True)
+if not grouped_moyenne.empty:
+    grouped_moyenne['Mois'] = grouped_moyenne['Mois'].apply(format_mois_fr)
+    st.subheader("📊 Moyenne de fréquentation au culte des missions et par mois")
+    st.dataframe(grouped_moyenne, use_container_width=True, hide_index=True)
+    fig_moy = px.bar(grouped_moyenne, x='Mois', y='Adultes', color='Mission',
+                     barmode='group', text='Mission', title="Fréquentation des Adultes par Mission")
+    fig_moy.update_layout(bargap=0.2, bargroupgap=0.04)
+    fig_moy.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
+    st.plotly_chart(fig_moy, use_container_width=True)
 
 # === NA / NC ===
 grouped_nanac = df_filtered.groupby(['Mission', 'Mois'], observed=True)[['NA', 'NC']].sum().reset_index()
-grouped_nanac['Mois'] = grouped_nanac['Mois'].apply(format_mois_fr)
-
-st.subheader("🧾 Nombre de NA | NC des missions par mois")
-st.dataframe(grouped_nanac, use_container_width=True, hide_index=True)
-
-fig_na = px.bar(grouped_nanac, x='Mois', y='NA', color='Mission',
-                barmode='group', text='Mission', title="Nombre de NA par Mission")
-fig_na.update_layout(bargap=0.2, bargroupgap=0.07)
-fig_na.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
-
-fig_nc = px.bar(grouped_nanac, x='Mois', y='NC', color='Mission',
-                barmode='group', text='Mission', title="Nombre de NC par Mission")
-fig_nc.update_layout(bargap=0.2, bargroupgap=0.07)
-fig_nc.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
-
-col1, col2 = st.columns(2)
-with col1:
-    st.plotly_chart(fig_na, use_container_width=True)
-with col2:
-    st.plotly_chart(fig_nc, use_container_width=True)
+if not grouped_nanac.empty:
+    grouped_nanac['Mois'] = grouped_nanac['Mois'].apply(format_mois_fr)
+    st.subheader("🧾 Nombre de NA | NC des missions par mois")
+    st.dataframe(grouped_nanac, use_container_width=True, hide_index=True)
+    fig_na = px.bar(grouped_nanac, x='Mois', y='NA', color='Mission',
+                    barmode='group', text='Mission', title="Nombre de NA par Mission")
+    fig_na.update_layout(bargap=0.2, bargroupgap=0.07)
+    fig_na.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
+    fig_nc = px.bar(grouped_nanac, x='Mois', y='NC', color='Mission',
+                    barmode='group', text='Mission', title="Nombre de NC par Mission")
+    fig_nc.update_layout(bargap=0.2, bargroupgap=0.07)
+    fig_nc.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
+    col1, col2 = st.columns(2)
+    with col1:
+        st.plotly_chart(fig_na, use_container_width=True)
+    with col2:
+        st.plotly_chart(fig_nc, use_container_width=True)
 
 # === Offrandes ===
 grouped_offrandes = df_filtered.groupby(['Mission', 'Mois'], observed=True)[['Offrandes']].sum().reset_index()
 grouped_offrandes_graph = grouped_offrandes.copy()
-grouped_offrandes['Mois'] = grouped_offrandes['Mois'].apply(format_mois_fr)
-grouped_offrandes_graph['Mois'] = grouped_offrandes_graph['Mois'].apply(format_mois_fr)
-grouped_offrandes['Offrandes'] = grouped_offrandes['Offrandes'].apply(lambda x: f"{x:,.2f} €".replace(",", " ").replace(".", ","))
-
-st.subheader("💶 Somme des Offrandes des missions par mois")
-st.dataframe(grouped_offrandes, use_container_width=True, hide_index=True)
-
-fig_off = px.bar(grouped_offrandes_graph, x='Mois', y='Offrandes', color='Mission',
-                 barmode='group', text='Mission', title="Offrandes par Mission")
-fig_off.update_layout(bargap=0.2, bargroupgap=0.04)
-fig_off.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
-st.plotly_chart(fig_off, use_container_width=True)
+if not grouped_offrandes.empty:
+    grouped_offrandes['Mois'] = grouped_offrandes['Mois'].apply(format_mois_fr)
+    grouped_offrandes_graph['Mois'] = grouped_offrandes_graph['Mois'].apply(format_mois_fr)
+    grouped_offrandes['Offrandes'] = grouped_offrandes['Offrandes'].apply(lambda x: f"{x:,.2f} €".replace(",", " ").replace(".", ","))
+    st.subheader("💶 Somme des Offrandes des missions par mois")
+    st.dataframe(grouped_offrandes, use_container_width=True, hide_index=True)
+    fig_off = px.bar(grouped_offrandes_graph, x='Mois', y='Offrandes', color='Mission',
+                     barmode='group', text='Mission', title="Offrandes par Mission")
+    fig_off.update_layout(bargap=0.2, bargroupgap=0.04)
+    fig_off.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
+    st.plotly_chart(fig_off, use_container_width=True)
 
 # === Export Excel ===
 excel_output = io.BytesIO()
