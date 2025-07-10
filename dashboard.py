@@ -156,7 +156,6 @@ def plot_grouped_bar(df, y_col, title, ylabel, path):
         bar_positions = x - total_width/2 + i * (bar_width + group_gap) + bar_width / 2
         bars = plt.bar(bar_positions, d[y_col], width=bar_width, label=mission)
 
-        # Texte sur les barres uniquement pour 'Adultes' ou 'Offrandes'
         if y_col in ['Adultes', 'Offrandes']:
             for xi, yi in zip(bar_positions, d[y_col]):
                 plt.text(xi, yi + 0.5, str(int(yi)), ha='center', va='bottom', fontsize=8, color='black')
@@ -212,7 +211,6 @@ def create_pdf(df_moy, df_nanac, df_off, imgs, mois_label):
     pdf = PDF()
     pdf.set_auto_page_break(auto=True, margin=15)
 
-    # Page 1 : Moyennes fréquentation
     pdf.add_page()
     pdf.set_font('Arial', 'B', 12)
     pdf.cell(0, 10, f"Fréquentation moyenne au culte - {', '.join(mois_label)}", 0, 1, 'C')
@@ -220,7 +218,6 @@ def create_pdf(df_moy, df_nanac, df_off, imgs, mois_label):
     pdf.ln(5)
     pdf.image(imgs['moyenne'], x=10, w=190)
 
-    # Page 2 : NA et NC ensemble
     pdf.add_page()
     pdf.set_font('Arial', 'B', 12)
     pdf.cell(0, 10, f"Nombre de NA | NC - {', '.join(mois_label)}", 0, 1, 'C')
@@ -230,7 +227,6 @@ def create_pdf(df_moy, df_nanac, df_off, imgs, mois_label):
     pdf.ln(3)
     pdf.image(imgs['nc'], x=10, w=190, h=90)
 
-    # Page 3 : Offrandes
     pdf.add_page()
     pdf.set_font('Arial', 'B', 12)
     pdf.cell(0, 10, f"Somme des offrandes - {', '.join(mois_label)}", 0, 1, 'C')
@@ -240,8 +236,6 @@ def create_pdf(df_moy, df_nanac, df_off, imgs, mois_label):
 
     return pdf
 
-
-# === Export PDF Button ===
 if st.button("🖨️ Générer le rapport PDF"):
     with st.spinner("Création du PDF en cours..."):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -262,8 +256,10 @@ if st.button("🖨️ Générer le rapport PDF"):
             pdf.output(pdf_path)
 
             with open(pdf_path, "rb") as f:
-                st.success("✅ Rapport PDF généré avec succès !")
-                st.download_button("📄 Télécharger le rapport PDF", data=f,
-                                   file_name="rapport_missions.pdf", mime="application/pdf")
+                pdf_bytes = f.read()
+
+            st.success("✅ Rapport PDF généré avec succès !")
+            st.download_button("📄 Télécharger le rapport PDF", data=pdf_bytes,
+                               file_name="rapport_missions.pdf", mime="application/pdf")
 
 # Fin du script
