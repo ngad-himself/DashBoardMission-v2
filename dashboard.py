@@ -79,9 +79,10 @@ grouped_moyenne['Mois'] = grouped_moyenne['Mois'].apply(format_mois_fr)
 st.subheader("📊 Moyenne de fréquentation au culte des missions et par mois")
 st.dataframe(grouped_moyenne, use_container_width=True, hide_index=True)
 
-fig_moy = px.bar(grouped_moyenne, x='Mois', y='Adultes', color='Mission', barmode='group', title="Fréquentation des Adultes par Mission")
+fig_moy = px.bar(grouped_moyenne, x='Mois', y='Adultes', color='Mission',
+                barmode='group', text='Mission', title="Fréquentation des Adultes par Mission")
 fig_moy.update_layout(bargap=0.2, bargroupgap=0.04)
-fig_moy.update_traces(marker_line_width=0)
+fig_moy.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
 st.plotly_chart(fig_moy, use_container_width=True)
 
 # === NA / NC ===
@@ -92,14 +93,14 @@ grouped_nanac['Mois'] = grouped_nanac['Mois'].apply(format_mois_fr)
 st.subheader("🧾 Nombre de NA | NC des missions par moi")
 st.dataframe(grouped_nanac, use_container_width=True, hide_index=True)
 fig_na = px.bar(grouped_nanac, x='Mois', y='NA', color='Mission', 
-                barmode='group', title="Nombre de NA par Mission")
+                barmode='group', text='Mission', title="Nombre de NA par Mission")
 fig_na.update_layout(bargap=0.2, bargroupgap=0.07)
-fig_na.update_traces(marker_line_width=0)
+fig_na.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
 
 fig_nc = px.bar(grouped_nanac, x='Mois', y='NC', color='Mission', 
-                barmode='group', title="Nombre de NC par Mission")
+                barmode='group', text='Mission', title="Nombre de NC par Mission")
 fig_nc.update_layout(bargap=0.2, bargroupgap=0.07)
-fig_nc.update_traces(marker_line_width=0)
+fig_nc.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
 
 # Affichage côte à côte
 col1, col2 = st.columns(2)
@@ -117,9 +118,10 @@ grouped_offrandes['Mois'] = grouped_offrandes['Mois'].apply(format_mois_fr)
 
 st.subheader("💶 Somme des Offrandes des missions par mois")
 st.dataframe(grouped_offrandes, use_container_width=True, hide_index=True)
-fig_off = px.bar(grouped_offrandes_graph, x='Mois', y='Offrandes', color='Mission', barmode='group', title="Offrandes par Mission")
+fig_off = px.bar(grouped_offrandes_graph, x='Mois', y='Offrandes', color='Mission',
+                barmode='group', text='Mission', title="Offrandes par Mission")
 fig_off.update_layout(bargap=0.2, bargroupgap=0.04)
-fig_off.update_traces(marker_line_width=0)
+fig_off.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
 st.plotly_chart(fig_off, use_container_width=True)
 
 # === Export Excel ===
@@ -176,21 +178,35 @@ def create_pdf(df_moy, df_nanac, df_off, imgs, mois_label):
     pdf = PDF()
     pdf.set_auto_page_break(auto=True, margin=15)
 
-    sections = [
-        ("Moyennes de fréquentation au culte", df_moy, imgs['moyenne']),
-        ("Nombre de NA et NC", df_nanac, imgs['nanac']),
-        ("Somme des offrandes", df_off, imgs['offrandes'])
-    ]
+    # Page 1 : Moyennes fréquentation
+    pdf.add_page()
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 10, f"Moyennes de fréquentation au culte - {', '.join(mois_label)}", 0, 1, 'C')
+    add_table(pdf, df_moy)
+    pdf.ln(5)
+    pdf.image(imgs['moyenne'], x=10, w=190)
 
-    for title, df_section, img_path in sections:
-        pdf.add_page()
-        pdf.set_font('Arial', 'B', 12)
-        pdf.cell(0, 10, f"{title} - {', '.join(mois_label)}", 0, 1, 'C')
-        add_table(pdf, df_section)
-        pdf.ln(5)
-        pdf.image(img_path, x=10, w=190)
+    # Page 2 : NA et NC ensemble
+    pdf.add_page()
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 10, f"Nombre de NA | NC - {', '.join(mois_label)}", 0, 1, 'C')
+    add_table(pdf, df_nanac)
+    pdf.ln(5)
+    pdf.image(imgs['na'], x=10, w=190, h=90)
+    pdf.ln(3)
+    pdf.image(imgs['nc'], x=10, w=190, h=90)
+
+
+    # Page 3 : Offrandes
+    pdf.add_page()
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 10, f"Somme des offrandes - {', '.join(mois_label)}", 0, 1, 'C')
+    add_table(pdf, df_off)
+    pdf.ln(5)
+    pdf.image(imgs['offrandes'], x=10, w=190)
 
     return pdf
+
 
 # === Export PDF Button ===
 if st.button("🖨️ Générer le rapport PDF"):
@@ -198,12 +214,14 @@ if st.button("🖨️ Générer le rapport PDF"):
         with tempfile.TemporaryDirectory() as temp_dir:
             paths = {
                 "moyenne": os.path.join(temp_dir, "moyenne.png"),
-                "nanac": os.path.join(temp_dir, "nanac.png"),
+                "na": os.path.join(temp_dir, "na.png"),
+                "nc": os.path.join(temp_dir, "nc.png"),
                 "offrandes": os.path.join(temp_dir, "offrandes.png")
             }
 
             save_fig_as_png(fig_moy, paths['moyenne'])
-            save_fig_as_png(fig_na, paths['nanac'])
+            save_fig_as_png(fig_na, paths['na'])
+            save_fig_as_png(fig_nc, paths['nc'])
             save_fig_as_png(fig_off, paths['offrandes'])
 
             pdf = create_pdf(grouped_moyenne, grouped_nanac, grouped_offrandes, paths, selected_months)
@@ -213,6 +231,6 @@ if st.button("🖨️ Générer le rapport PDF"):
             with open(pdf_path, "rb") as f:
                 st.success("✅ Rapport PDF généré avec succès !")
                 st.download_button("📄 Télécharger le rapport PDF", data=f,
-                                file_name="rapport_missions.pdf", mime="application/pdf")
+                                   file_name="rapport_missions.pdf", mime="application/pdf")
 
 # Fin du script
