@@ -68,6 +68,11 @@ default_month_idx = get_previous_month_index()
 default_missions = [m for m in ['Alès', 'Béziers', 'MNO'] if m in missions]
 selected_missions = st.multiselect("Sélectionnez la/les mission(s)", options=missions, default=default_missions)
 selected_months = st.multiselect("Sélectionnez le(s) mois", options=mois_str, default=[mois_str[default_month_idx]])
+
+if not selected_missions or not selected_months:
+    st.warning("❗ Veuillez sélectionner au moins une mission et un mois pour afficher les données.")
+    st.stop()
+
 selected_months_period = [mois_complet[mois_str.index(m)] for m in selected_months]
 
 df_filtered = df[(df['Mission'].isin(selected_missions)) & (df['Mois'].isin(selected_months_period))]
