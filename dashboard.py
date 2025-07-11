@@ -90,7 +90,7 @@ cols_moyenne = ['Hommes', 'Femmes', 'Adultes']
 grouped_moyenne = df_filtered.groupby(['Mission', 'Mois'], observed=True)[cols_moyenne].mean().round().reset_index()
 if not grouped_moyenne.empty:
     grouped_moyenne['Mois'] = grouped_moyenne['Mois'].apply(format_mois_fr)
-    st.subheader("📊 Moyenne de fréquentation au culte des missions et par mois")
+    st.subheader("📊 Moyenne de fréquentation au culte des missions par mois")
     st.dataframe(grouped_moyenne, use_container_width=True, hide_index=True)
     fig_moy = px.bar(grouped_moyenne, x='Mois', y='Adultes', color='Mission',
                      barmode='group', text='Mission', title="Fréquentation des Adultes par Mission")
