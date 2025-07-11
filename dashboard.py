@@ -93,7 +93,7 @@ if not grouped_moyenne.empty:
     st.subheader("📊 Moyenne de fréquentation au culte des missions par mois")
     st.dataframe(grouped_moyenne, use_container_width=True, hide_index=True)
     fig_moy = px.bar(grouped_moyenne, x='Mois', y='Adultes', color='Mission',
-                     barmode='group', text='Mission', title="Fréquentation des adultes par Mission")
+                     barmode='group', text='Mission', title="Fréquentation des adultes par mission")
     fig_moy.update_layout(bargap=0.2, bargroupgap=0.04)
     fig_moy.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
     st.plotly_chart(fig_moy, use_container_width=True)
@@ -105,11 +105,11 @@ if not grouped_nanac.empty:
     st.subheader("🧾 Nombre de NA | NC des missions par mois")
     st.dataframe(grouped_nanac, use_container_width=True, hide_index=True)
     fig_na = px.bar(grouped_nanac, x='Mois', y='NA', color='Mission',
-                    barmode='group', text='Mission', title="Nombre de NA par Mission")
+                    barmode='group', text='Mission', title="Nombre de NA par mission")
     fig_na.update_layout(bargap=0.2, bargroupgap=0.07)
     fig_na.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
     fig_nc = px.bar(grouped_nanac, x='Mois', y='NC', color='Mission',
-                    barmode='group', text='Mission', title="Nombre de NC par Mission")
+                    barmode='group', text='Mission', title="Nombre de NC par mission")
     fig_nc.update_layout(bargap=0.2, bargroupgap=0.07)
     fig_nc.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
     col1, col2 = st.columns(2)
@@ -125,10 +125,10 @@ if not grouped_offrandes.empty:
     grouped_offrandes['Mois'] = grouped_offrandes['Mois'].apply(format_mois_fr)
     grouped_offrandes_graph['Mois'] = grouped_offrandes_graph['Mois'].apply(format_mois_fr)
     grouped_offrandes['Offrandes'] = grouped_offrandes['Offrandes'].apply(lambda x: f"{x:,.2f} €".replace(",", " ").replace(".", ","))
-    st.subheader("💶 Somme des Offrandes des missions par mois")
+    st.subheader("💶 Somme des offrandes des missions par mois")
     st.dataframe(grouped_offrandes, use_container_width=True, hide_index=True)
     fig_off = px.bar(grouped_offrandes_graph, x='Mois', y='Offrandes', color='Mission',
-                     barmode='group', text='Mission', title="Offrandes par Mission")
+                     barmode='group', text='Mission', title="Offrandes par mission")
     fig_off.update_layout(bargap=0.2, bargroupgap=0.04)
     fig_off.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
     st.plotly_chart(fig_off, use_container_width=True)
