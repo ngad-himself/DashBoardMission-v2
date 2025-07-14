@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime
 import io
+import re
 import tempfile
 import os
 from fpdf import FPDF
@@ -20,7 +21,7 @@ MOIS_FR = {
 
 st.title("Dashboard Missions Occitanie Est - Synthèse mensuelle")
 
-@st.cache_data
+@st.cache_data(ttl=0)  # pas de cache, données rechargées à chaque exécution
 def load_data():
     url = "https://docs.google.com/spreadsheets/d/1omlbZlKb_gpKW3K5GgbIB977T7hFajpyrMmcfCsld3Y/export?format=csv&gid=0"
     df = pd.read_csv(url)
@@ -28,11 +29,14 @@ def load_data():
     def clean_offrandes(val):
         if pd.isna(val):
             return 0.0
-        val = str(val).replace('€', '').replace(',', '.').strip()
+        val = str(val)
+        val = re.sub(r'[ \u00A0\s]', '', val)  # supprime espaces normaux, insécables et \u00A0
+        val = val.replace('€', '').replace(',', '.')
         try:
             return float(val) if val else 0.0
         except:
             return 0.0
+
 
     df['Offrandes'] = df['Offrandes'].apply(clean_offrandes)
     df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y', errors='coerce')
