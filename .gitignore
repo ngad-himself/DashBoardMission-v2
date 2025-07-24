@@ -2,6 +2,9 @@ authorized_users.json
 users.db
 check-users.py
 .env
+# Fichiers sensibles
+.streamlit/secrets.toml
+
 # Environnement virtuel
 venv/
 .env/
