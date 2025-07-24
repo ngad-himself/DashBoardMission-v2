@@ -74,8 +74,7 @@ st.markdown(
 # === Authentification ===
 load_dotenv()
 SUPER_ADMIN_EMAIL = os.getenv("SUPER_ADMIN_EMAIL")
-with open("authorized_users.json", "r") as f:
-    EMAILS_AUTORISES = json.load(f)["authorized_emails"]
+AUTHORIZED_USERS = json.loads(st.secrets["AUTHORIZED_USERS_JSON"])
 
 # Connexion SQLite
 conn = sqlite3.connect("users.db")
@@ -109,7 +108,7 @@ if not st.session_state['authenticated']:
 
     email = st.text_input("Adresse e-mail")
     if email:
-        if email not in EMAILS_AUTORISES:
+        if email not in AUTHORIZED_USERS:
             st.error("⛔ Cet e-mail n'est pas autorisé.")
             st.stop()
 
