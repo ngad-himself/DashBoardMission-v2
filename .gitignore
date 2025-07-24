@@ -1,0 +1,9 @@
+authorized_users.json
+users.db
+check-users.py
+.env
+# Environnement virtuel
+venv/
+.env/
+__pycache__/
+*.pyc
