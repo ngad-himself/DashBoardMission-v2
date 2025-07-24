@@ -121,7 +121,6 @@ if not st.session_state['authenticated']:
                 else:
                     create_user(email, new_password)
                     st.success("✅ Compte créé. Vous pouvez maintenant vous connecter.")
-                    st.stop()
                     st.rerun()
         else:
             password = st.text_input("Mot de passe", type="password")
