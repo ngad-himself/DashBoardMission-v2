@@ -9,7 +9,6 @@ import os
 from dotenv import load_dotenv
 import json
 from fpdf import FPDF
-assert FPDF.__module__.startswith("fpdf")  # optionnel pour valider
 import matplotlib.pyplot as plt
 import numpy as np
 import sqlite3
