@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sqlite3
 import hashlib
+import time
 
 st.set_page_config(layout="centered")
 

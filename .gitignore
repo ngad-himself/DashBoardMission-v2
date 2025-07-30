@@ -6,7 +6,6 @@ check-users.py
 .streamlit/secrets.toml
 
 # Environnement virtuel
-venv/
 .env/
 __pycache__/
 *.pyc
