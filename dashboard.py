@@ -31,7 +31,7 @@ st.markdown(
         color: white;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         text-align: center;
-        font-size: 1rem;
+        font-size: 1.5rem;
         font-weight: bold;
     }
     .auth-title {
