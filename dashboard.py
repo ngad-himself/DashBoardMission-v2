@@ -104,7 +104,7 @@ if 'authenticated' not in st.session_state:
     st.session_state['authenticated'] = False
 
 if not st.session_state['authenticated']:
-    st.markdown('<div class="auth-container">', unsafe_allow_html=True)
+    st.markdown('<div class="auth-container">Mission Occitanie-Est </div>', unsafe_allow_html=True)
     st.markdown('<div class="auth-title">🔐 Authentification requise</div>', unsafe_allow_html=True)
 
     email = st.text_input("Adresse e-mail")
