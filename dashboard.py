@@ -137,12 +137,6 @@ if not st.session_state['authenticated']:
             st.stop()
     st.markdown('</div>', unsafe_allow_html=True)
 
-
-    # if st.session_state['email'] == SUPER_ADMIN_EMAIL:
-    #     st.success("👑 Connecté en tant que Super Admin")
-    # else:
-    #     st.info(f"✅ Connecté en tant qu'utilisateur : {st.session_state['email']}")
-
 # === Interface après authentification réussie ===
 if st.session_state['authenticated'] and 'email' in st.session_state:
     with st.sidebar:
@@ -150,22 +144,10 @@ if st.session_state['authenticated'] and 'email' in st.session_state:
             st.header("Super Admin Dashboard")
         else:
             st.info(f"✅ Connecté en tant qu'utilisateur : {st.session_state['email']}")
-        #st.markdown(f"**Connecté en tant que :** {st.session_state['email']}")
         if st.button("🔓 Se déconnecter", key=f"logout_{st.session_state['email']}"):
             st.session_state['authenticated'] = False
             del st.session_state['email']
             st.rerun()
-
-    # if st.session_state['email'] is not SUPER_ADMIN_EMAIL:
-    #     #st.success("👑 Connecté en tant que Super Admin")
-    # else:
-    #     st.info(f"✅ Connecté en tant qu'utilisateur : {st.session_state['email']}")
-
-    # === Suite du dashboard ici ===
-    # ➜ tu peux mettre ici ton code complet du dashboard comme `load_data()`, graphiques, PDF, etc.
-    #st.write("👉 Place ici tout ton code de dashboard après authentification.")
-
-
 
     st.set_page_config(layout="wide")
 
@@ -194,7 +176,6 @@ if st.session_state['authenticated'] and 'email' in st.session_state:
             except:
                 return 0.0
 
-
         df['Offrandes'] = df['Offrandes'].apply(clean_offrandes)
         df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y', errors='coerce')
         df = df.dropna(subset=['Date'])
@@ -205,42 +186,55 @@ if st.session_state['authenticated'] and 'email' in st.session_state:
 
     df = load_data()
 
+    missions = sorted(df['Mission'].dropna().unique())
+
+    # --- Gestion accès missions selon user ---
+    user_info = AUTHORIZED_USERS.get(st.session_state["email"], {})
+    role = user_info.get("role", "user")
+    missions_autorisees = missions if role == "superadmin" else user_info.get("missions", [])
+
+    if not missions_autorisees:
+        st.error("⚠️ Aucune mission n’est associée à ce compte.")
+        st.stop()
+
+    st.success(f"🎉 Bienvenue ! Vous êtes connecté au compte de : {', '.join(missions_autorisees)}")
+
+    # Filtrage du dataframe global selon mission(s) autorisée(s)
+    df = df[df['Mission'].isin(missions_autorisees)]
+
+    MOIS_AVEC_DONNEES = sorted(df['Mois'].dropna().unique())
+
     def format_mois_fr(period):
         mois_annee = period.strftime('%B %Y')
         for en, fr in MOIS_FR.items():
             mois_annee = mois_annee.replace(en, fr)
         return mois_annee
 
-    missions = sorted(df['Mission'].dropna().unique())
-    mois_avec_donnees = sorted(df['Mois'].dropna().unique())
-    mois_str = [format_mois_fr(m) for m in mois_avec_donnees]
-
+    mois_str = [format_mois_fr(m) for m in MOIS_AVEC_DONNEES]
 
     def get_previous_month_index():
         today = pd.Timestamp.today()
         prev_month = (today - pd.DateOffset(months=1)).to_period('M')
         try:
-            return mois_avec_donnees.index(prev_month)
+            return MOIS_AVEC_DONNEES.index(prev_month)
         except:
-            return len(mois_avec_donnees) - 1
+            return len(MOIS_AVEC_DONNEES) - 1
 
-    # Sélections
+    # === Sélection mois uniquement (plus de sélection mission visible) ===
     default_month_idx = get_previous_month_index()
-    default_missions = [m for m in ['Alès', 'Béziers', 'MNO'] if m in missions]
-    selected_missions = st.multiselect("Sélectionnez la/les mission(s)", options=missions, default=default_missions)
     selected_months = st.multiselect("Sélectionnez le(s) mois", options=mois_str, default=[mois_str[default_month_idx]])
 
-    if not selected_missions or not selected_months:
-        st.warning("❗ Veuillez sélectionner au moins une mission et un mois pour afficher les données.")
+    if not selected_months:
+        st.warning("❗ Veuillez sélectionner au moins un mois pour afficher les données.")
         st.stop()
 
     try:
-        selected_months_period = [mois_avec_donnees[mois_str.index(m)] for m in selected_months]
+        selected_months_period = [MOIS_AVEC_DONNEES[mois_str.index(m)] for m in selected_months]
     except ValueError:
         st.info("⏳ Encore un peu de patience, il n'y a pas de statistiques pour ce(s) mois sélectionné(s).")
         st.stop()
 
-    df_filtered = df[(df['Mission'].isin(selected_missions)) & (df['Mois'].isin(selected_months_period))]
+    df_filtered = df[df['Mois'].isin(selected_months_period)]
 
     if df_filtered.empty:
         st.info("⏳ Encore un peu de patience, il n'y a pas de statistiques pour ce(s) mois sélectionné(s).")
@@ -309,16 +303,16 @@ if st.session_state['authenticated'] and 'email' in st.session_state:
     # === PDF ===
     def plot_grouped_bar(df, y_col, title, ylabel, path):
         plt.figure(figsize=(10, 5))
-        missions = df['Mission'].unique()
+        missions_uniq = df['Mission'].unique()
         mois = df['Mois'].unique()
         x = np.arange(len(mois))
 
         group_gap = 0.15
         total_width = 0.8
-        n = len(missions)
-        bar_width = (total_width - group_gap * (n - 1)) / n
+        n = len(missions_uniq)
+        bar_width = (total_width - group_gap * (n - 1)) / n if n > 0 else 0.8
 
-        for i, mission in enumerate(missions):
+        for i, mission in enumerate(missions_uniq):
             d = df[df['Mission'] == mission]
             bar_positions = x - total_width/2 + i * (bar_width + group_gap) + bar_width / 2
             bars = plt.bar(bar_positions, d[y_col], width=bar_width, label=mission)
@@ -388,39 +382,40 @@ if st.session_state['authenticated'] and 'email' in st.session_state:
         pdf.cell(0, 10, f"Nombre de NA | NC - {', '.join(mois_label)}", 0, 1, 'C')
         add_table(pdf, df_nanac)
         pdf.ln(5)
-        pdf.image(imgs['na'], x=10, w=190, h=90)
-        pdf.ln(3)
-        pdf.image(imgs['nc'], x=10, w=190, h=90)
+        pdf.image(imgs['na'], x=10, w=190, h=60)
+        pdf.add_page()
+        pdf.image(imgs['nc'], x=10, w=190, h=60)
 
         pdf.add_page()
         pdf.set_font('Arial', 'B', 12)
-        pdf.cell(0, 10, f"Somme des offrandes - {', '.join(mois_label)}", 0, 1, 'C')
+        pdf.cell(0, 10, f"Offrandes - {', '.join(mois_label)}", 0, 1, 'C')
         add_table(pdf, df_off)
         pdf.ln(5)
         pdf.image(imgs['offrandes'], x=10, w=190)
 
-        return pdf
+        output_pdf = io.BytesIO()
+        pdf.output(output_pdf)
+        output_pdf.seek(0)
+        return output_pdf
 
-    if st.button("🖨️ Générer le rapport PDF"):
-        with st.spinner("Création du PDF en cours..."):
-            with tempfile.TemporaryDirectory() as temp_dir:
-                paths = {
-                    "moyenne": os.path.join(temp_dir, "moyenne.png"),
-                    "na": os.path.join(temp_dir, "na.png"),
-                    "nc": os.path.join(temp_dir, "nc.png"),
-                    "offrandes": os.path.join(temp_dir, "offrandes.png")
-                }
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path_moy = os.path.join(tmpdir, "moyenne.png")
+        path_na = os.path.join(tmpdir, "na.png")
+        path_nc = os.path.join(tmpdir, "nc.png")
+        path_off = os.path.join(tmpdir, "offrandes.png")
 
-                plot_grouped_bar(grouped_moyenne, 'Adultes', "Fréquentation des Adultes par Mission", "Adultes", paths['moyenne'])
-                plot_grouped_bar(grouped_nanac, 'NA', "Nombre de NA par Mission", "NA", paths['na'])
-                plot_grouped_bar(grouped_nanac, 'NC', "Nombre de NC par Mission", "NC", paths['nc'])
-                plot_grouped_bar(grouped_offrandes_graph, 'Offrandes', "Offrandes par Mission", "Euros", paths['offrandes'])
+        plot_grouped_bar(grouped_moyenne, 'Adultes', 'Fréquentation des adultes', 'Nombre d’adultes', path_moy)
+        plot_grouped_bar(grouped_nanac, 'NA', 'Nombre de NA', 'Nombre de NA', path_na)
+        plot_grouped_bar(grouped_nanac, 'NC', 'Nombre de NC', 'Nombre de NC', path_nc)
+        plot_grouped_bar(grouped_offrandes_graph, 'Offrandes', 'Offrandes par mission', 'Euros', path_off)
 
-                pdf = create_pdf(grouped_moyenne, grouped_nanac, grouped_offrandes, paths, selected_months)
-                pdf_path = os.path.join(temp_dir, "rapport_missions.pdf")
-                pdf.output(pdf_path)
+        pdf_data = create_pdf(grouped_moyenne, grouped_nanac, grouped_offrandes, {
+            'moyenne': path_moy,
+            'na': path_na,
+            'nc': path_nc,
+            'offrandes': path_off
+        }, [format_mois_fr(m) for m in selected_months_period])
 
-                with open(pdf_path, "rb") as f:
-                    st.success("✅ Rapport PDF généré avec succès !")
-                    st.download_button("📄 Télécharger le rapport PDF", data=f,
-                                    file_name="rapport_missions.pdf", mime="application/pdf")
+    st.download_button("📥 Télécharger rapport PDF", data=pdf_data,
+                       file_name="rapport_mission.pdf",
+                       mime="application/pdf")
