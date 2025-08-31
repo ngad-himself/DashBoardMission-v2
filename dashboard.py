@@ -282,7 +282,7 @@ if st.session_state['authenticated'] and 'email' in st.session_state:
         grouped_offrandes['Offrandes'] = grouped_offrandes['Offrandes'].apply(lambda x: f"{x:,.2f} €".replace(",", " ").replace(".", ","))
         st.subheader("💶 Somme des dons des missions par mois")
         st.dataframe(grouped_offrandes, use_container_width=True, hide_index=True)
-        fig_off = px.bar(grouped_offrandes_graph, x='Mois', y='Dons', color='Mission',
+        fig_off = px.bar(grouped_offrandes_graph, x='Mois', y='Offrandes', labels={"Offrandes": "Dons"}, color='Mission',
                         barmode='group', text='Mission', title="Dons par mission")
         fig_off.update_layout(bargap=0.2, bargroupgap=0.04)
         fig_off.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
