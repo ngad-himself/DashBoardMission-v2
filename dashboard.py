@@ -245,7 +245,7 @@ if st.session_state['authenticated'] and 'email' in st.session_state:
     grouped_moyenne = df_filtered.groupby(['Mission', 'Mois'], observed=True)[cols_moyenne].mean().round().reset_index()
     if not grouped_moyenne.empty:
         grouped_moyenne['Mois'] = grouped_moyenne['Mois'].apply(format_mois_fr)
-        st.subheader("📊 Moyenne de fréquentation au culte des missions par mois")
+        st.subheader("📊 Moyenne de fréquentation aux rencontres des missions par mois")
         st.dataframe(grouped_moyenne, use_container_width=True, hide_index=True)
         fig_moy = px.bar(grouped_moyenne, x='Mois', y='Adultes', color='Mission',
                         barmode='group', text='Mission', title="Fréquentation des adultes par mission")
@@ -280,10 +280,10 @@ if st.session_state['authenticated'] and 'email' in st.session_state:
         grouped_offrandes['Mois'] = grouped_offrandes['Mois'].apply(format_mois_fr)
         grouped_offrandes_graph['Mois'] = grouped_offrandes_graph['Mois'].apply(format_mois_fr)
         grouped_offrandes['Offrandes'] = grouped_offrandes['Offrandes'].apply(lambda x: f"{x:,.2f} €".replace(",", " ").replace(".", ","))
-        st.subheader("💶 Somme des offrandes des missions par mois")
+        st.subheader("💶 Somme des dons des missions par mois")
         st.dataframe(grouped_offrandes, use_container_width=True, hide_index=True)
-        fig_off = px.bar(grouped_offrandes_graph, x='Mois', y='Offrandes', color='Mission',
-                        barmode='group', text='Mission', title="Offrandes par mission")
+        fig_off = px.bar(grouped_offrandes_graph, x='Mois', y='Dons', color='Mission',
+                        barmode='group', text='Mission', title="Dons par mission")
         fig_off.update_layout(bargap=0.2, bargroupgap=0.04)
         fig_off.update_traces(marker_line_width=0, textposition='auto', textfont=dict(color='white'))
         st.plotly_chart(fig_off, use_container_width=True)
@@ -293,7 +293,7 @@ if st.session_state['authenticated'] and 'email' in st.session_state:
     with pd.ExcelWriter(excel_output, engine='xlsxwriter') as writer:
         grouped_moyenne.to_excel(writer, index=False, sheet_name='Moyennes')
         grouped_nanac.to_excel(writer, index=False, sheet_name='NA_NC')
-        grouped_offrandes.to_excel(writer, index=False, sheet_name='Offrandes')
+        grouped_offrandes.to_excel(writer, index=False, sheet_name='Dons')
     excel_output.seek(0)
 
     st.download_button("📥 Télécharger Excel", data=excel_output,
@@ -317,7 +317,7 @@ if st.session_state['authenticated'] and 'email' in st.session_state:
             bar_positions = x - total_width/2 + i * (bar_width + group_gap) + bar_width / 2
             bars = plt.bar(bar_positions, d[y_col], width=bar_width, label=mission)
 
-            if y_col in ['Adultes', 'Offrandes']:
+            if y_col in ['Adultes', 'Dons']:
                 for xi, yi in zip(bar_positions, d[y_col]):
                     plt.text(xi, yi + 0.5, str(int(yi)), ha='center', va='bottom', fontsize=8, color='black')
 
@@ -372,7 +372,7 @@ if st.session_state['authenticated'] and 'email' in st.session_state:
 
         pdf.add_page()
         pdf.set_font('Arial', 'B', 12)
-        pdf.cell(0, 10, f"Fréquentation moyenne au culte - {', '.join(mois_label)}", 0, 1, 'C')
+        pdf.cell(0, 10, f"Fréquentation moyenne aux rencontres - {', '.join(mois_label)}", 0, 1, 'C')
         add_table(pdf, df_moy)
         pdf.ln(5)
         pdf.image(imgs['moyenne'], x=10, w=190)
